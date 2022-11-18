@@ -1,0 +1,17 @@
+# Local package
+-e .
+
+# external requirements
+black
+matplotlib
+numpy
+opencv-python
+opencv-python
+seaborn
+scipy
+scikit-learn
+tikzplotlib
+torch
+torchvision
+torchmetrics
+tqdm
