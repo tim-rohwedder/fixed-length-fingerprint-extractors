@@ -1,6 +1,7 @@
 from os.path import join, dirname
 from os import remove
 
+import torch
 import cv2
 import numpy as np
 
@@ -13,6 +14,7 @@ from flx.data.embedding_dataset import (
     combine_embeddings,
 )
 from flx.data.fingerprint_dataset import (
+    FingerprintDataset,
     SFingeDataset,
     FVC2004Dataset,
     NistSD4Dataset,
@@ -35,19 +37,24 @@ from flx.preprocessing.augmentation import (
 from flx.visualization.show_with_opencv import (
     show_tensor_as_image,
     show_minutia_maps_from_tensor,
-    save_3Dtensor_as_image_grid,
 )
 
 TEST_DATA_DIR = join(dirname(__file__), "data")
 
 
-def test_identifier_set():
-    def print_set(ds: IdentifierSet):
-        print(f"number of samples: {len(ds)}")
-        print(f"number of subjects: {ds.num_subjects}")
-        for idx in range(len(ds)):
-            print(f"index={idx} id={ds[idx]}")
+def assert_is_image_tensor(tensor: torch.Tensor) -> None:
+    assert tensor.ndim == 3
+    assert tensor.shape[0] == 1 or tensor.shape[0] == 0
+    assert tensor.shape[1] > 0
+    assert tensor.shape[2] > 0
 
+
+def assert_identifiers(ds: IdentifierSet, num_subjects: int, num_samples: int):
+    assert len(ds) == num_samples
+    assert ds.num_subjects == num_subjects
+
+
+def test_identifier_set():
     all_ids = [
         Identifier(4, 1),
         Identifier(3, 1),
@@ -63,35 +70,33 @@ def test_identifier_set():
         Identifier(5, 1),
     ]
 
-    print("\nIdentifier set")
     ds = IdentifierSet(all_ids)
-    print_set(ds)
+    assert_identifiers(ds, 5, 12)
 
-    print("\nFilter by subject")
-    subjects = [1, 3, 4, 5]
-    print(f"Subjects for subset: {subjects}")
+    # Test filter by subject
     subset = ds.filter_by_subject([2, 4])
-    print_set(subset)
+    assert_identifiers(subset, 2, 4)
+    assert subset[0] == Identifier(2, 0)
+    assert subset[1] == Identifier(2, 1)
+    assert subset[2] == Identifier(4, 0)
+    assert subset[3] == Identifier(4, 1)
 
     print("\nFilter by id")
     print("Ids for subset " + " ".join(str(i) for i in all_ids[4:6]))
     subset = ds.filter_by_id(IdentifierSet(all_ids[4:6]))
-    print_set(subset)
+    assert_identifiers(subset, 2, 2)
+    assert subset[0] == all_ids[4]
+    assert subset[1] == all_ids[5]
 
-    print("\nFilter by index")
-    print("Indices for subset " + " ".join(str(i) for i in range(3)))
     subset = ds.filter_by_index(range(3))
-    print_set(subset)
+    assert_identifiers(subset, 1, 3)
+    assert subset[0] == Identifier(1, 0)
+    assert subset[1] == Identifier(1, 1)
+    assert subset[2] == Identifier(1, 2)
 
 
 def test_label_dataset():
-    def print_dataset(ds: LabelDataset):
-        print(f"number of samples: {len(ds)}")
-        print(f"number of subjects: {ds.num_subjects}")
-        for idx in range(len(ds)):
-            print(f"index={idx} id={ds.ids[idx]} label={ds.get(ds.ids[idx])}")
-
-    ds1 = LabelDataset(
+    ds1: LabelDataset = LabelDataset(
         IdentifierSet(
             [
                 Identifier(4, 1),
@@ -102,28 +107,16 @@ def test_label_dataset():
             ]
         )
     )
-    ds2 = LabelDataset(
-        IdentifierSet(
-            [
-                Identifier(4, 0),
-                Identifier(1, 0),
-                Identifier(1, 1),
-                Identifier(2, 0),
-                Identifier(2, 1),
-                Identifier(5, 0),
-                Identifier(5, 1),
-            ]
-        )
-    )
-
-    print("\nDataset 1")
-    print_dataset(ds1)
-    print("\nDataset 2")
-    print_dataset(ds2)
+    assert len(ds1) == 5
+    assert ds1.num_subjects == 4
+    assert ds1.get(Identifier(1, 2)) == 0
+    assert ds1.get(Identifier(3, 0)) == 1
+    assert ds1.get(Identifier(3, 1)) == 1
+    assert ds1.get(Identifier(4, 1)) == 2
+    assert ds1.get(Identifier(5, 2)) == 3
 
 
 def test_embedding_dataset():
-    print("Testing EmbeddingDataset")
     ids = [Identifier(0, 0), Identifier(0, 1), Identifier(1, 0), Identifier(1, 1)]
     embeddings = np.array([np.random.random(4) for _ in ids])
 
@@ -140,24 +133,14 @@ def test_embedding_dataset():
         print(emb.vector)
 
 
-def test_image_dataset(dataset_type: type, root_dir_name: str):
-    print(f"Testing {dataset_type}({root_dir_name})")
-    dataset = dataset_type(get_fingerprint_dataset_path(root_dir_name))
-    if len(dataset) == 0:
-        return
-    image = dataset.get(dataset.ids[0])
-    print(image.shape)
-    show_tensor_as_image(image, f"{root_dir_name}", wait=False)
-
-
-def test_minutia_map_dataset():
-    print("Testing ISTMinutiaMapDataset")
-    dataset = SFingeMinutiaMapDataset(join(TEST_DATA_DIR, "SFingev2Example"))
+def test_minutia_map_sfinge():
+    dataset = SFingeMinutiaMapDataset(join(TEST_DATA_DIR, "SFingeExample"))
     minutia_map, mask = dataset.get(Identifier(0, 0))
     print(minutia_map.shape)
     show_minutia_maps_from_tensor(minutia_map)
 
-    print("Testing MCYTMinutiaMapDataset")
+
+def test_minutia_map_mcyt_capactive():
     dataset = MCYTCapacitiveMinutiaMapDataset(
         join(TEST_DATA_DIR, "MCYTCapacitiveExample")
     )
@@ -165,7 +148,8 @@ def test_minutia_map_dataset():
     print(minutia_map.shape)
     show_minutia_maps_from_tensor(minutia_map)
 
-    print("Testing MCYTMinutiaMapDataset")
+
+def test_minutia_map_mcyt_optical():
     dataset = MCYTOpticalMinutiaMapDataset(join(TEST_DATA_DIR, "MCYTOpticalExample"))
     minutia_map, mask = dataset[0][2]
     print(minutia_map.shape)
@@ -179,7 +163,7 @@ def test_pose_dataset():
         return PoseDataset(ids, [pose_distribution.sample() for _ in ids])
 
     print("Testing PoseDataset")
-    fingerprint_dataset = SFingeDataset(join(TEST_DATA_DIR, "SFingev2Example"))
+    fingerprint_dataset = SFingeDataset(join(TEST_DATA_DIR, "SFingeExample"))
     pose_dataset = make_random_pose_dataset(
         fingerprint_dataset.ids, pose_distribution=RandomPoseTransform()
     )
@@ -197,7 +181,7 @@ def test_pose_dataset():
 
 
 def test_transformed_dataset():
-    dataset = SFingeDataset(join(TEST_DATA_DIR, "SFingev2Example"))
+    dataset = SFingeDataset(join(TEST_DATA_DIR, "SFingeExample"))
 
     transformed = TransformedDataset(dataset)
     for bid in transformed.ids:
@@ -239,24 +223,38 @@ def test_transformed_dataset():
     cv2.destroyAllWindows()
 
 
-def main():
-    test_minutia_map_dataset()
-    exit(0)
-    test_identifier_set()
-    test_label_dataset()
-    test_embedding_dataset()
-    test_image_dataset(SFingeDataset, "SFingev2Example")
-    test_image_dataset(SFingeDataset, "SFingev2")
-    test_image_dataset(FVC2004Dataset, "FVC2004_DB1A")
-    test_image_dataset(NistSD4Dataset, "NIST SD4")
-    test_image_dataset(NistSD14Dataset, "NIST SD14")
-    test_image_dataset(MCYTOpticalDataset, "mcyt330_optical")
-    test_image_dataset(MCYTCapacitiveDataset, "mcyt330_capacitive")
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
-    test_transformed_dataset()
-    test_pose_dataset()
+def _test_image_dataset(
+    dataset_type: type,
+    root_dir_name: str,
+    expected_num_subjects: int,
+    expected_num_samples: int,
+):
+    if root_dir_name.startswith("test_data_dir:"):
+        root_dir_name = join(TEST_DATA_DIR, root_dir_name[14:])
+    dataset: FingerprintDataset = dataset_type(
+        get_fingerprint_dataset_path(root_dir_name)
+    )
+    assert dataset.ids.num_subjects == expected_num_subjects
+    assert len(dataset.ids) == expected_num_samples
+    image: torch.Tensor = dataset.get(dataset.ids[0])
+    assert_is_image_tensor(image)
+    show_tensor_as_image(image, f"{root_dir_name}", wait=True)
 
 
-if __name__ == "__main__":
-    main()
+def test_dataset_SFingeExample():
+    _test_image_dataset(SFingeDataset, "test_data_dir:SFingeExample", 4, 4 * 2)
+
+
+# # Uncomment to test that the datasets are present on the system
+#
+# def test_dataset_SFingev2ValidationSeparateSubjects():
+#     _test_image_dataset(SFingeDataset, "SFingev2ValidationSeparateSubjects", 2000, 2000 * 4)
+#
+# def test_dataset_SFingev2():
+#     _test_image_dataset(SFingeDataset, "SFingev2", 8000, 8000 * 10)
+#
+# def test_dataset_MCYT330_Optical():
+#     _test_image_dataset(MCYTOpticalDataset, "mcyt330_optical", 3300, 3300 * 12)
+#
+# def test_dataset_MCYT330_Capacitive():
+#     _test_image_dataset(MCYTCapacitiveDataset, "mcyt330_capacitive", 3300, 3300 * 12)
