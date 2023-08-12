@@ -1,4 +1,4 @@
-from flx.data.biometric_dataset import (
+from flx.data.dataset import (
     Identifier,
 )
 

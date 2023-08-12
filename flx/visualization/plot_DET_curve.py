@@ -17,7 +17,6 @@ def plot_verification_results(
         biometric_evaluation_type="algorithm",
         plot_title=plot_title,
         plot_eer_line=True,
-        
     )
 
     # Customize axes

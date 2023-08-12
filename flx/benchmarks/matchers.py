@@ -1,25 +1,27 @@
+from abc import ABC, abstractmethod
+
 import numpy as np
 
-from flx.data.biometric_dataset import Identifier
-from flx.data.embedding_dataset import EmbeddingDataset
-from flx.data.biometric_dataset import Identifier
+from flx.data.dataset import Identifier
+from flx.data.embedding_loader import EmbeddingLoader
+from flx.data.dataset import Identifier
 
 
-class BiometricMatcher:
-    def __init__(self):
-        raise NotImplementedError()
-
+class BiometricMatcher(ABC):
+    @abstractmethod
     def similarity(self, sample1: Identifier, sample2: Identifier) -> float:
         raise NotImplementedError()
 
 
 class VectorizedMatcher(BiometricMatcher):
+    @abstractmethod
     def preload_vectorized(self, samples: list[Identifier]) -> None:
         """
         Preloads all samples into one numpy ndarray for vectorized comparison.
         """
         raise NotImplementedError()
 
+    @abstractmethod
     def vectorized_similarity(self, sample: Identifier) -> np.ndarray[float]:
         """
         Similarities with all the samples in the preloaded vector.
@@ -28,37 +30,28 @@ class VectorizedMatcher(BiometricMatcher):
 
 
 class CosineSimilarityMatcher(VectorizedMatcher):
-    def __init__(self, embedding_dataset: EmbeddingDataset):
+    def __init__(self, embedding_dataset: EmbeddingLoader):
         self._embeddings = embedding_dataset
-        self._vector = None
+        self._matrix = None
 
     def similarity(self, sample1: Identifier, sample2: Identifier) -> float:
         emb1 = self._embeddings.get(sample1)
         emb2 = self._embeddings.get(sample2)
-        return np.dot(emb1.vector, emb2.vector)
-
-    @property
-    def embedding_dimensions(self) -> int:
-        if len(self._embeddings) == 0:
-            return None
-        _, _, emb = self._embeddings[0]
-        return emb.dimensions
+        return np.dot(emb1, emb2)
 
     def preload_vectorized(self, samples: list[Identifier]) -> None:
         """
         Preloads all samples into one numpy ndarray for vectorized comparison.
         """
-        self._vector = np.ndarray(shape=(len(samples), self.embedding_dimensions))
-        for i, sample in enumerate(samples):
-            emb = self._embeddings.get(sample)
-            self._vector[i, :] = emb.vector
+        vectors = [self._embeddings.get(s) for s in samples]
+        self._matrix = np.stack(vectors)
 
     def vectorized_similarity(self, sample: Identifier) -> np.ndarray[float]:
         """
         Similarities for all the items in the preloaded vector.
         """
         emb = self._embeddings.get(sample)
-        vals = np.matmul(self._vector, emb.vector)
+        vals = np.matmul(self._matrix, emb.vector)
         # Negative similarity makes no sense, as a fingerprint does not have an opposite
         vals[vals < 0] = 0
         return vals

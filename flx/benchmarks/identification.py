@@ -5,7 +5,7 @@ from os.path import join
 import tqdm
 import numpy as np
 
-from flx.data.biometric_dataset import Identifier
+from flx.data.dataset import Identifier
 from flx.benchmarks.matchers import BiometricMatcher, VectorizedMatcher
 from flx.benchmarks.biometric_search import (
     ExhaustiveSearch,
@@ -30,7 +30,9 @@ class FoldResult:
             else:
                 self._non_mated_results.append(result)
         self._mated_ranks: list[int] = [s.rank for s in self._mated_results]
-        self._mated_similarities: np.ndarray = [s.similarity for s in self._mated_results]
+        self._mated_similarities: np.ndarray = [
+            s.similarity for s in self._mated_results
+        ]
         self._non_mated_similarities: np.ndarray = [
             s.similarity for s in self._non_mated_results
         ]
@@ -72,7 +74,7 @@ class FoldResult:
 
     def save(self, path: str) -> None:
         results = self._mated_results + self._non_mated_results
-        jsn =  exhaustive_search_results_to_json(results)
+        jsn = exhaustive_search_results_to_json(results)
         with open(os.path.join(path, "searches.json"), "w") as f:
             json.dump(jsn, f)
 
@@ -89,13 +91,19 @@ class IdentificationResult:
         self._results = results
 
     def false_positive_identification_rate(self, threshold: float) -> float:
-        rates = [result.false_positive_identification_rate(threshold) for result in self._results]
+        rates = [
+            result.false_positive_identification_rate(threshold)
+            for result in self._results
+        ]
         return sum(rates) / len(rates)
 
     def false_negative_identification_rate(
         self, threshold: float = None, fpir: int = None
     ) -> float:
-        rates = [result.false_negative_identification_rate(threshold=threshold, fpir=fpir) for result in self._results]
+        rates = [
+            result.false_negative_identification_rate(threshold=threshold, fpir=fpir)
+            for result in self._results
+        ]
         return sum(rates) / len(rates)
 
     def get_mated_ranks(self) -> list[int]:
@@ -104,11 +112,17 @@ class IdentificationResult:
 
     def get_mated_similarities(self) -> list[float]:
         # return the concatenated list of mated similarities for each result
-        return [sim for result in self._results for sim in result.get_mated_similarities()]
+        return [
+            sim for result in self._results for sim in result.get_mated_similarities()
+        ]
 
     def get_highest_non_mated_similarities(self) -> list[float]:
         # return the concatenated list of highest non-mated similarities for each result
-        return [sim for result in self._results for sim in result.get_highest_non_mated_similarities()]
+        return [
+            sim
+            for result in self._results
+            for sim in result.get_highest_non_mated_similarities()
+        ]
 
     def save(self, path: str) -> None:
         for i, r in enumerate(self._results):
@@ -121,15 +135,18 @@ class IdentificationResult:
     def load(path: str) -> dict:
         n_folds = len([f.name for f in os.scandir(path) if f.is_dir()])
         if n_folds == 0:
-            raise RuntimeError(f"Cannot load identification results from {path}: The directory is empty!")
+            raise RuntimeError(
+                f"Cannot load identification results from {path}: The directory is empty!"
+            )
         print(f"Loading identification results for {n_folds} cross-validation folds")
-        return IdentificationResult([FoldResult.load(join(path, f"fold_{i}")) for i in range(n_folds)])
+        return IdentificationResult(
+            [FoldResult.load(join(path, f"fold_{i}")) for i in range(n_folds)]
+        )
 
 
 class IdentificationBenchmark:
     def __init__(self, folds: list[list[ExhaustiveSearch]]):
         self._folds: list[list[ExhaustiveSearch]] = folds
-
 
     def _run_single_fold(self, matcher: BiometricMatcher, fold: int) -> FoldResult:
         assert 0 <= fold and fold < len(self._folds)
@@ -145,22 +162,24 @@ class IdentificationBenchmark:
             matcher.preload_vectorized(gallery)
             for search in tqdm.tqdm(searches):
                 similarities = matcher.vectorized_similarity(search.probe)
-                results.append(ExhaustiveSearchResult.from_similarity_scores(search, similarities))
+                results.append(
+                    ExhaustiveSearchResult.from_similarity_scores(search, similarities)
+                )
         else:
             print("Running non-vectorized")
             for search in tqdm.tqdm(searches):
                 similarities = np.array(
-                    [
-                        matcher.similarity(search.probe, sample)
-                        for sample in gallery
-                    ]
+                    [matcher.similarity(search.probe, sample) for sample in gallery]
                 )
-                results.append(ExhaustiveSearchResult.from_similarity_scores(search, similarities))
+                results.append(
+                    ExhaustiveSearchResult.from_similarity_scores(search, similarities)
+                )
         return FoldResult(results)
-    
+
     def run(self, matcher: BiometricMatcher) -> IdentificationResult:
         return IdentificationResult(
-            [self._run_single_fold(matcher, i) for i in range(len(self._folds))])
+            [self._run_single_fold(matcher, i) for i in range(len(self._folds))]
+        )
 
     def save(self, path: str) -> None:
         jsn = [exhaustive_searches_to_json(s) for s in self._folds]

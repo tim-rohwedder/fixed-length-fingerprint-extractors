@@ -111,7 +111,7 @@ class VerificationBenchmark:
     def __init__(self, comparisons: list[BiometricComparison]):
         self._comparisons: list[BiometricComparison] = comparisons
 
-    def run(self, matcher: BiometricMatcher, save: bool = True) -> VerificationResult:
+    def run(self, matcher: BiometricMatcher) -> VerificationResult:
         results = []
         for comp in tqdm.tqdm(self._comparisons):
             similarity = matcher.similarity(comp.sample1, comp.sample2)

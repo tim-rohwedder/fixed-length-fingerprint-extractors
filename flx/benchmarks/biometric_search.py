@@ -1,8 +1,9 @@
 import numpy as np
 
-from flx.data.biometric_dataset import (
+from flx.data.dataset import (
     Identifier,
 )
+
 
 class ExhaustiveSearch:
     """
@@ -51,13 +52,16 @@ class ExhaustiveSearchResult:
         Returns whether the identification decision using the specified threshold is positive or negative.
         """
         return threshold <= self.similarity
-    
+
     @staticmethod
-    def from_similarity_scores(search: ExhaustiveSearch, gallery_similarities: np.ndarray[np.float16]) -> "ExhaustiveSearchResult":
+    def from_similarity_scores(
+        search: ExhaustiveSearch, gallery_similarities: np.ndarray[np.float16]
+    ) -> "ExhaustiveSearchResult":
         return ExhaustiveSearchResult(
             search,
             rank=_calculate_rank(search, gallery_similarities),
-            similarity=float(np.amax(gallery_similarities)))
+            similarity=float(np.amax(gallery_similarities)),
+        )
 
 
 def exhaustive_searches_to_json(searches: list[ExhaustiveSearch]) -> dict:
@@ -72,13 +76,16 @@ def exhaustive_searches_to_json(searches: list[ExhaustiveSearch]) -> dict:
 
 
 def exhaustive_searches_from_json(jsn: dict) -> list[ExhaustiveSearch]:
-    gallery: np.ndarray[Identifier] = np.squeeze(np.array(Identifier.ids_from_json(jsn["gallery"])))
+    gallery: np.ndarray[Identifier] = np.squeeze(
+        np.array(Identifier.ids_from_json(jsn["gallery"]))
+    )
     probes: list[Identifier] = Identifier.ids_from_json(jsn["probes"])
     mated: list[bool] = jsn["mated"]
     return [
         ExhaustiveSearch(probe=p, gallery=gallery, is_mated=m)
         for p, m in zip(probes, mated)
     ]
+
 
 def exhaustive_search_results_to_json(results: list[ExhaustiveSearchResult]) -> dict:
     return {
@@ -87,10 +94,14 @@ def exhaustive_search_results_to_json(results: list[ExhaustiveSearchResult]) -> 
         "similarities": [r.similarity for r in results],
     }
 
+
 def exhaustive_search_results_from_json(jsn: dict) -> list[ExhaustiveSearchResult]:
     searches: list[ExhaustiveSearch] = exhaustive_searches_from_json(jsn["searches"])
     ranks: list[int] = jsn["ranks"]
     similarities: list[float] = jsn["similarities"]
     assert len(searches) == len(ranks)
     assert len(searches) == len(similarities)
-    return [ExhaustiveSearchResult(se, rank=r, similarity=si) for se, r, si in zip(searches, ranks, similarities)]
+    return [
+        ExhaustiveSearchResult(se, rank=r, similarity=si)
+        for se, r, si in zip(searches, ranks, similarities)
+    ]

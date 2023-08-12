@@ -4,13 +4,15 @@ import numpy as np
 from flx.visualization.show_with_opencv import show_minutia_maps
 
 
-def _remove_points_outside_image(coords: np.ndarray, oris: np.ndarray, height: int, width: int) -> np.ndarray:
-  mask_x = coords[:,0] >= width
-  mask_y = coords[:,1] >= height
-  mask = np.logical_or(mask_x, mask_y)
-  coords = np.delete(coords, np.where(mask), axis=0)
-  oris = np.delete(oris, np.where(mask))
-  return coords, oris
+def _remove_points_outside_image(
+    coords: np.ndarray, oris: np.ndarray, height: int, width: int
+) -> np.ndarray:
+    mask_x = coords[:, 0] >= width
+    mask_y = coords[:, 1] >= height
+    mask = np.logical_or(mask_x, mask_y)
+    coords = np.delete(coords, np.where(mask), axis=0)
+    oris = np.delete(oris, np.where(mask))
+    return coords, oris
 
 
 def _rescale_points(
@@ -158,7 +160,9 @@ def create_minutia_map(
             target_resolution=out_resolution,
         ).astype(np.uint16)
 
-    minutia_locations, minutia_orientations = _remove_points_outside_image(minutia_locations, minutia_orientations, out_resolution[1], out_resolution[0])
+    minutia_locations, minutia_orientations = _remove_points_outside_image(
+        minutia_locations, minutia_orientations, out_resolution[1], out_resolution[0]
+    )
 
     minu_layer_weights = _layer_weights_softmax(
         _convert_orientations(minutia_orientations), n_layers=n_layers

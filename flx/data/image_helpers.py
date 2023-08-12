@@ -7,7 +7,7 @@ import torchvision.transforms.functional as VTF
 from flx.setup.config import INPUT_SIZE
 
 
-def get_deepfinger_input_resolution() -> tuple[int, int]:
+def get_input_resolution() -> tuple[int, int]:
     return (INPUT_SIZE, INPUT_SIZE)
 
 
@@ -32,7 +32,7 @@ def pad_and_resize(
     return VTF.resize(img, target_size, antialias=True)
 
 
-def pad_and_resize_to_deepfinger_input_size(
+def pad_and_resize_to_deepprint_input_size(
     img: Union[np.ndarray, torch.Tensor],
     roi: Union[None, tuple[int, int]] = None,
     fill: float = 0.0,
@@ -43,12 +43,10 @@ def pad_and_resize_to_deepfinger_input_size(
     if roi is not None:
         img = VTF.center_crop(img, roi)
 
-    return pad_and_resize(
-        img, (INPUT_SIZE, INPUT_SIZE), fill=fill
-    )
+    return pad_and_resize(img, (INPUT_SIZE, INPUT_SIZE), fill=fill)
 
 
-def transform_to_deepfinger_input_size(
+def transform_to_input_size(
     minutia_points: np.ndarray,
     original_height: int,
     original_width: int,
@@ -56,10 +54,10 @@ def transform_to_deepfinger_input_size(
 ) -> np.ndarray:
     """
     Transforms the pixel coordinates in the same way that the pixels in the original image would be
-    transformed by pad_and_resize_to_deepfinger_input_size.
+    transformed by pad_and_resize_to_deepprint_input_size.
     """
     minutia_points = minutia_points.astype(np.float16)
-    
+
     if minutia_points.shape[0] == 0:
         return minutia_points
 

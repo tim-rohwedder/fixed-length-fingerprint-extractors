@@ -1,9 +1,9 @@
 import json
 
 
-from flx.data.biometric_dataset import Identifier, BiometricDataset
+from flx.data.dataset import Identifier, IdentifierSet, DataLoader
 
-from flx.preprocessing.augmentation import PoseTransform
+from flx.image_processing.augmentation import PoseTransform
 
 
 def _poses_to_json(poses: list[PoseTransform]) -> dict:
@@ -26,24 +26,21 @@ def _poses_from_json(json: dict) -> list[PoseTransform]:
     ]
 
 
-class PoseDataset(BiometricDataset):
+class PoseLoader(DataLoader):
     """
-    A biometric dataset which contains fingerprint poses for given
+    Data loader for fingerprint poses to given
     fingerprint samples.
 
     Each pose consists of a rotation and a shift in x and y direction.
     The dataset can be save to or loaded from json.
     """
 
-    def __init__(self, ids: list[Identifier], poses: list[PoseTransform]):
-        self._ids = sorted(ids)
+    def __init__(self, ids: IdentifierSet, poses: list[PoseTransform]):
+        self._ids = ids
         self._id_to_pose = {bid: pose for bid, pose in zip(ids, poses)}
 
-    def __len__(self) -> int:
-        return len(self._ids)
-
     @property
-    def ids(self) -> list[Identifier]:
+    def ids(self) -> IdentifierSet:
         return self._ids
 
     def get(self, identifier: Identifier) -> PoseTransform:
@@ -58,9 +55,9 @@ class PoseDataset(BiometricDataset):
             json.dump(obj, file)
 
     @staticmethod
-    def load(path: str) -> "PoseDataset":
+    def load(path: str) -> "PoseLoader":
         with open(path, "r") as file:
             obj = json.load(file)
             ids = Identifier.ids_from_json(obj["ids"])
             poses = _poses_from_json(obj["poses"])
-            return PoseDataset(ids, poses)
+            return PoseLoader(ids, poses)

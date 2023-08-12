@@ -1,55 +1,54 @@
+from typing import Union
+
+import numpy as np
 import torch
 import tqdm
 
-from flx.utils.torch_helpers import get_dataloader_args, get_device
-from flx.data.embedding_dataset import BiometricEmbedding, EmbeddingDataset
-from flx.data.biometric_dataset import Identifier
-from flx.data.biometric_dataset import BiometricDataset
-from flx.models.DeepFinger import DeepFingerOutput
+from flx.models.torch_helpers import get_dataloader_args, get_device
+from flx.data.embedding_loader import EmbeddingLoader
+from flx.data.dataset import IdentifierSet
+from flx.data.dataset import Dataset
+from flx.models.deep_print_arch import DeepPrintOutput
 
 
-def _make_embeddings_list(new_embeddings: torch.Tensor, new_ids: list[Identifier]):
-        emb_vectors = (
-            new_embeddings.detach()
-            .to(device=torch.device("cpu"))
-            .numpy()
-        )
-        return [
-            BiometricEmbedding(bid, vec) for bid, vec in zip(new_ids, emb_vectors)
-        ]
+def _to_numpy(embeddings: torch.Tensor):
+    if embeddings is None:
+        return None
+    return embeddings.detach().to(device=torch.device("cpu")).numpy()
+
+
+def _concatenate_embeddings_if_exist(
+    ids: IdentifierSet, embeddings: list[Union[None, np.ndarray]]
+) -> torch.Tensor:
+    embeddings_filtered = [e for e in embeddings if e is not None]
+    if len(embeddings_filtered) == 0:
+        return None
+    if len(embeddings_filtered) != len(embeddings):
+        raise ValueError("Some embeddings are None, others are not!")
+    return EmbeddingLoader(ids, np.concatenate(embeddings, axis=0))
+
 
 def extract_embeddings(
-    model: torch.nn.Module, eval_dataset: BiometricDataset
-) -> tuple[EmbeddingDataset, EmbeddingDataset]:
-    """
-    Calculates similarity scores for the given dataset and outputs them to data/embeddings/<filename>
-
-    The directory is created if it does not exits. Any existing files in the directory are deleted.
-    """
+    model: torch.nn.Module, fingerprint_dataset: Dataset
+) -> tuple[EmbeddingLoader, EmbeddingLoader]:
     texture_embeddings = []
     minutia_embeddings = []
 
     model = model.to(get_device())
     dataloader = torch.utils.data.DataLoader(
-        eval_dataset, **get_dataloader_args(train=False)
+        fingerprint_dataset, **get_dataloader_args(train=False)
     )
     model.eval()  # No longer outputs logits and minutia map in eval mode
     with torch.no_grad():
-        for batch_subjects, batch_impressions, vals in tqdm.tqdm(dataloader):
+        for vals in tqdm.tqdm(dataloader):
             fp_imgs = vals
             fp_imgs: torch.Tensor = fp_imgs.to(get_device())
-            output: DeepFingerOutput = model(fp_imgs)
-            ids = [
-                Identifier(s, i)
-                for s, i in zip(batch_subjects.tolist(), batch_impressions.tolist())
-            ]
+            output: DeepPrintOutput = model(fp_imgs)
 
-            if output.texture_embeddings is not None:
-                 texture_embeddings += _make_embeddings_list(output.texture_embeddings, ids)
-            if output.minutia_embeddings is not None:
-                 minutia_embeddings += _make_embeddings_list(output.minutia_embeddings, ids)
+            texture_embeddings.append(_to_numpy(output.texture_embeddings))
+            minutia_embeddings.append(_to_numpy(output.minutia_embeddings))
 
     return (
-        EmbeddingDataset(texture_embeddings) if len(texture_embeddings) > 0 else None,
-        EmbeddingDataset(minutia_embeddings) if len(minutia_embeddings) > 0 else None,
+        _concatenate_embeddings_if_exist(fingerprint_dataset.ids, texture_embeddings),
+        _concatenate_embeddings_if_exist(fingerprint_dataset.ids, minutia_embeddings),
     )

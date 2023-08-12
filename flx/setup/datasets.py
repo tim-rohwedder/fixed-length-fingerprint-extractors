@@ -1,40 +1,34 @@
-from typing import Iterable, Union
+from typing import Iterable
 
 import torch
 
-from flx.data.transformed_dataset import TransformedDataset
+from flx.data.transformed_image_loader import TransformedImageLoader
 
 from flx.data.image_helpers import (
-    pad_and_resize_to_deepfinger_input_size,
+    pad_and_resize_to_deepprint_input_size,
 )
-from flx.preprocessing.binarization import (
+from flx.image_processing.binarization import (
     LazilyAllocatedBinarizer,
 )
-from flx.preprocessing.augmentation import RandomPoseTransform, RandomQualityTransform
-from flx.data.biometric_dataset import (
+from flx.image_processing.augmentation import RandomPoseTransform, RandomQualityTransform
+from flx.data.dataset import (
     Identifier,
     IdentifierSet,
-    BiometricDataset,
-    ZippedDataset,
-    MergedDataset,
-    FilteredDataset,
-    DummyDataset,
+    Dataset,
+    ConstantDataLoader,
 )
-from flx.data.fingerprint_dataset import (
-    SFingeDataset,
-    FVC2004Dataset,
-    MCYTCapacitiveDataset,
-    MCYTOpticalDataset,
+from flx.data.image_loader import (
+    SFingeLoader,
+    FVC2004Loader,
+    MCYTCapacitiveLoader,
+    MCYTOpticalLoader,
     NistSD4Dataset,
-    NistSD14Dataset,
 )
-from flx.data.label_dataset import LabelDataset
-from flx.data.minutia_map_dataset import (
-    SFingeMinutiaMapDataset,
-    MCYTCapacitiveMinutiaMapDataset,
-    MCYTOpticalMinutiaMapDataset,
-    MINUTIA_MAP_SIZE,
-    MINUTIA_MAP_CHANNELS,
+from flx.data.label_index import LabelIndex
+from flx.data.minutia_map_loader import (
+    SFingeMinutiaMapLoader,
+    MCYTCapacitiveMinutiaMapLoader,
+    MCYTOpticalMinutiaMapLoader,
 )
 
 
@@ -65,81 +59,81 @@ MCYT_CAPACITIVE_BINARIZATION = LazilyAllocatedBinarizer(4.8)
 MCYT_OPTICAL_BINARIZATION = LazilyAllocatedBinarizer(3.8)
 FVC_BINARIZATION = LazilyAllocatedBinarizer(1.8)
 NIST_SD4_BINARIZATION = LazilyAllocatedBinarizer(4.0)
-NIST_SD14_BINARIZATION = LazilyAllocatedBinarizer(1.5)
 
 
 def get_training_set(
     sfinge_dir: str, mcyt_optical_dir: str, mcyt_capacitive_dir: str
-) -> BiometricDataset:
+) -> Dataset:
     # SFinge images
     NUM_SFINGE_SUBJECTS = 6000
     sfinge_ids = _make_identifiers(range(NUM_SFINGE_SUBJECTS), range(10))
-    ds_sfinge = FilteredDataset(SFingeDataset(sfinge_dir), sfinge_ids)
-    ds_sfinge = TransformedDataset(
-        images=ds_sfinge,
+    sfinge_images = TransformedImageLoader(
+        images=SFingeLoader(sfinge_dir),
         poses=POSE_AUGMENTATION,
         transforms=[
             QUALITY_AUGMENTATION,
             SFINGE_BINARIZATION,
-            pad_and_resize_to_deepfinger_input_size,
+            pad_and_resize_to_deepprint_input_size,
         ],
     )
+    sfinge_images = Dataset(sfinge_images, sfinge_ids)
 
     # MCYT images
     NUM_MCYT_SUBJECTS = 2000
-    ds_optical = MCYTOpticalDataset(mcyt_optical_dir)
-    ds_optical = FilteredDataset(
-        ds_optical, ds_optical.ids.filter_by_index(range(NUM_MCYT_SUBJECTS * 12))
-    )
-    ds_optical = TransformedDataset(
-        images=ds_optical,
+    mcyt_optical_images = TransformedImageLoader(
+        images=MCYTOpticalLoader(mcyt_optical_dir),
         poses=POSE_AUGMENTATION,
         transforms=[QUALITY_AUGMENTATION, MCYT_OPTICAL_BINARIZATION],
     )
-
-    ds_capacitive = MCYTCapacitiveDataset(mcyt_capacitive_dir)
-    ds_capacitive = FilteredDataset(
-        ds_capacitive, ds_capacitive.ids.filter_by_index(range(NUM_MCYT_SUBJECTS * 12))
+    mcyt_optical_images = Dataset(
+        mcyt_optical_images,
+        mcyt_optical_images.ids.filter_by_index(range(NUM_MCYT_SUBJECTS * 12)),
     )
-    ds_capacitive = TransformedDataset(
-        images=ds_capacitive,
+
+    mcyt_capacitive_images = TransformedImageLoader(
+        images=MCYTCapacitiveLoader(mcyt_capacitive_dir),
         poses=POSE_AUGMENTATION,
         transforms=[QUALITY_AUGMENTATION, MCYT_CAPACITIVE_BINARIZATION],
     )
+    mcyt_capacitive_images = Dataset(
+        mcyt_capacitive_images,
+        mcyt_capacitive_images.ids.filter_by_index(range(NUM_MCYT_SUBJECTS * 12)),
+    )
 
-    ds_mcyt = MergedDataset([ds_optical, ds_capacitive], share_subjects=True)
-    ds = MergedDataset([ds_sfinge, ds_mcyt], share_subjects=False)
+    mcyt_images = Dataset.concatenate(
+        mcyt_optical_images, mcyt_capacitive_images, share_subjects=True
+    )
+    ds = Dataset.concatenate(sfinge_images, mcyt_images, share_subjects=False)
 
     # Minutia Maps
-    ds_mm_sfinge = FilteredDataset(SFingeMinutiaMapDataset(sfinge_dir), sfinge_ids)
-    assert ds_mm_sfinge.ids == ds_sfinge.ids
+    sfinge_minumaps = Dataset(SFingeMinutiaMapLoader(sfinge_dir), sfinge_ids)
 
-    ds_mm_optical = MCYTOpticalMinutiaMapDataset(mcyt_optical_dir)
-    ds_mm_optical = FilteredDataset(
-        ds_mm_optical, ds_mm_optical.ids.filter_by_index(range(NUM_MCYT_SUBJECTS * 12))
+    # mcyt_optical_minumaps = MCYTOpticalMinutiaMapLoader(mcyt_optical_dir)
+    # mcyt_optical_minumaps = Dataset(
+    #     mcyt_optical_minumaps, mcyt_optical_minumaps.ids.filter_by_index(range(NUM_MCYT_SUBJECTS * 12))
+    # )
+    #
+    # mcyt_capacitive_minumaps = MCYTCapacitiveMinutiaMapLoader(mcyt_capacitive_dir)
+    # mcyt_capacitive_minumaps = Dataset(
+    #     mcyt_capacitive_minumaps,
+    #     mcyt_capacitive_minumaps.ids.filter_by_index(range(NUM_MCYT_SUBJECTS * 12)),
+    # )
+    # assert mcyt_capacitive_minumaps.ids == mcyt_capacitive_images.ids
+    #
+    # ds_mm_mcyt = MergedDataset([ds_mm_optical, ds_mm_capacitive], share_subjects=True)
+
+    mcyt_minumaps = Dataset(ConstantDataLoader(torch.tensor([])), mcyt_images.ids)
+    minumaps = Dataset.concatenate(
+        sfinge_minumaps, mcyt_minumaps, share_subjects=False
     )
-
-    ds_mm_capacitive = MCYTCapacitiveMinutiaMapDataset(mcyt_capacitive_dir)
-    ds_mm_capacitive = FilteredDataset(
-        ds_mm_capacitive,
-        ds_mm_capacitive.ids.filter_by_index(range(NUM_MCYT_SUBJECTS * 12)),
-    )
-    assert ds_mm_capacitive.ids == ds_capacitive.ids
-
-    #ds_mm_mcyt = MergedDataset([ds_mm_optical, ds_mm_capacitive], share_subjects=True)
-    ds_mm_mcyt = DummyDataset(ds_mcyt.ids, torch.tensor([]))
-    ds_mm = MergedDataset([ds_mm_sfinge, ds_mm_mcyt], share_subjects=False)
 
     # Labels
-    labels = LabelDataset(ds.ids)
+    labels = Dataset(LabelIndex(ds.ids), ds.ids)
 
     assert ds.num_subjects == NUM_SFINGE_SUBJECTS + NUM_MCYT_SUBJECTS
     assert len(ds) == NUM_SFINGE_SUBJECTS * 10 + NUM_MCYT_SUBJECTS * 12 * 2
-    assert ds.ids == ds_mm.ids
-    return (ds, ds_mm, labels)
-
-
-
+    assert ds.ids == minumaps.ids
+    return (ds, minumaps, labels)
 
 
 #  ----------------- TESTING ----------------------
@@ -147,118 +141,90 @@ def get_training_set(
 
 def _make_sfinge_no_background_testing(
     root_dir: str, subjects: Iterable[int], impressions: Iterable[int]
-) -> BiometricDataset:
-    ds = FilteredDataset(
-        SFingeDataset(root_dir), _make_identifiers(subjects, impressions)
-    )
-    return TransformedDataset(
-        images=ds,
+) -> Dataset:
+    loader = TransformedImageLoader(
+        images=SFingeLoader(root_dir),
         poses=None,
-        transforms=[SFINGE_BINARIZATION, pad_and_resize_to_deepfinger_input_size],
+        transforms=[SFINGE_BINARIZATION, pad_and_resize_to_deepprint_input_size],
     )
+    return Dataset(loader, _make_identifiers(subjects, impressions))
 
 
-def get_sfinge_example(root_dir: str) -> BiometricDataset:
+def get_sfinge_example(root_dir: str) -> Dataset:
     return _make_sfinge_no_background_testing(
         root_dir=root_dir, subjects=range(4), impressions=range(2)
     )
 
 
-def get_sfinge_validation_separate_subjects(root_dir: str) -> BiometricDataset:
+def get_sfinge_validation_separate_subjects(root_dir: str) -> Dataset:
     return _make_sfinge_no_background_testing(
         root_dir=root_dir, subjects=range(42000, 44000), impressions=range(4)
     )
 
 
-def get_sfinge_test_none(root_dir: str) -> TransformedDataset:
+def get_sfinge_test(root_dir: str) -> TransformedImageLoader:
     return _make_sfinge_no_background_testing(
         root_dir=root_dir, subjects=range(1000), impressions=range(4)
     )
 
 
-def get_sfinge_test_optical(root_dir: str) -> TransformedDataset:
-    ds = FilteredDataset(
-        SFingeDataset(root_dir), _make_identifiers(range(1000), range(4))
-    )
-    return TransformedDataset(
-        images=ds,
-        poses=None,
-        transforms=[SFINGE_BINARIZATION, pad_and_resize_to_deepfinger_input_size],
-    )
-
-
-def get_sfinge_test_capacitive(root_dir: str) -> TransformedDataset:
-    ds = FilteredDataset(
-        SFingeDataset(root_dir), _make_identifiers(range(1000), range(4))
-    )
-    return TransformedDataset(
-        images=ds,
-        poses=None,
-        transforms=[SFINGE_BINARIZATION, pad_and_resize_to_deepfinger_input_size],
+def _get_mcyt(
+    loader: Dataset,
+    poses: RandomPoseTransform = None,
+    only_last_n: int = None,
+) -> TransformedImageLoader:
+    loader = TransformedImageLoader(
+        images=loader,
+        poses=poses,
+        transforms=[MCYT_OPTICAL_BINARIZATION, pad_and_resize_to_deepprint_input_size],
     )
 
-
-
-def _get_mcyt(loaded_ds: BiometricDataset, poses: RandomPoseTransform = None, only_last_n: int = None) -> TransformedDataset:
     NUM_MCYT = 3300
     if only_last_n is None:
         only_last_n = NUM_MCYT
     start_index = NUM_MCYT - only_last_n
-
-    loaded_ds = FilteredDataset(
-        loaded_ds,
-        loaded_ds.ids.filter_by_index(range(start_index * 12, NUM_MCYT * 12)),
+    dataset = Dataset(
+        loader,
+        loader.ids.filter_by_index(range(start_index * 12, NUM_MCYT * 12)),
     )
-    assert loaded_ds.num_subjects == only_last_n
-    assert len(loaded_ds) == only_last_n * 12
-    return TransformedDataset(
-        images=loaded_ds,
-        poses=poses,
-        transforms=[MCYT_OPTICAL_BINARIZATION, pad_and_resize_to_deepfinger_input_size],
-    )
+    assert dataset.num_subjects == only_last_n
+    assert len(dataset) == only_last_n * 12
+    return dataset
 
 
-def get_mcyt_optical(root_dir: str, poses: RandomPoseTransform = None, only_last_n: int = None) -> TransformedDataset:
-    ds = MCYTOpticalDataset(root_dir)
+def get_mcyt_optical(
+    root_dir: str, poses: RandomPoseTransform = None, only_last_n: int = None
+) -> TransformedImageLoader:
+    ds = MCYTOpticalLoader(root_dir)
     return _get_mcyt(ds, poses, only_last_n)
 
 
-def get_mcyt_capacitive(root_dir: str, poses: RandomPoseTransform = None, only_last_n: int = None) -> TransformedDataset:
-    ds = MCYTCapacitiveDataset(root_dir)
+def get_mcyt_capacitive(
+    root_dir: str, poses: RandomPoseTransform = None, only_last_n: int = None
+) -> TransformedImageLoader:
+    ds = MCYTCapacitiveLoader(root_dir)
     return _get_mcyt(ds, poses, only_last_n)
 
 
-def get_fvc2004_db1a(root_dir: str) -> TransformedDataset:
+def get_fvc2004_db1a(root_dir: str) -> TransformedImageLoader:
     NUM_SUBJECTS = 100
-    ds = FVC2004Dataset(root_dir)
-    assert ds.num_subjects == NUM_SUBJECTS
-    assert len(ds) == NUM_SUBJECTS * 8
-    return TransformedDataset(
-        images=ds,
+    loader = TransformedImageLoader(
+        images=FVC2004Loader(root_dir),
         poses=None,
         transforms=[FVC_BINARIZATION],
     )
+    assert loader.ids.num_subjects == NUM_SUBJECTS
+    assert len(loader.ids) == NUM_SUBJECTS * 8
+    return Dataset(loader, loader.ids)
 
 
-def get_nist_sd4(root_dir: str) -> TransformedDataset:
+def get_nist_sd4(root_dir: str) -> TransformedImageLoader:
     NUM_SUBJECTS = 2000
-    ds = NistSD4Dataset(root_dir)
-    assert ds.num_subjects == NUM_SUBJECTS
-    assert len(ds) == NUM_SUBJECTS * 2
-    return TransformedDataset(
-        images=ds,
+    loader = TransformedImageLoader(
+        images=NistSD4Dataset(root_dir),
         poses=None,
         transforms=[NIST_SD4_BINARIZATION],
     )
-
-
-def get_nist_sd14(root_dir: str) -> TransformedDataset:
-    NUM_SUBJECTS = 27000
-    ds = NistSD14Dataset(root_dir)
-    assert ds.num_subjects == NUM_SUBJECTS
-    assert len(ds) == NUM_SUBJECTS * 2
-    return TransformedDataset(
-        images=ds,
-        poses=None,
-        transforms=[NIST_SD14_BINARIZATION],
-    )
+    assert loader.ids.num_subjects == NUM_SUBJECTS
+    assert len(loader.ids) == NUM_SUBJECTS * 2
+    return Dataset(loader, loader.ids)

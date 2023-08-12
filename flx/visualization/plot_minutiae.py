@@ -9,14 +9,16 @@ from flx.visualization.show_with_opencv import (
 )
 
 # Define the constants for the colors and circle/line parameters
-MINUTIA_DOT_COLOR = (255, 0, 0) # Blue in BGR format
-MINUTIA_DOT_RADIUS = 5 # Pixels
-LINE_COLOR = (0, 255, 0) # Green in BGR format
-LINE_THICKNESS = 2 # Pixels
-LINE_LENGTH = 8 # Pixels
+MINUTIA_DOT_COLOR = (255, 0, 0)  # Blue in BGR format
+MINUTIA_DOT_RADIUS = 5  # Pixels
+LINE_COLOR = (0, 255, 0)  # Green in BGR format
+LINE_THICKNESS = 2  # Pixels
+LINE_LENGTH = 8  # Pixels
 
 
-def _plot_points_and_lines(img: cv2.Mat, coords: list[list[int]], angles: list[float], out_path: str) -> None:
+def _plot_points_and_lines(
+    img: cv2.Mat, coords: list[list[int]], angles: list[float], out_path: str
+) -> None:
     # Read the image from the filepath
 
     # Loop through the coordinates and angles arrays
@@ -39,7 +41,9 @@ def _plot_points_and_lines(img: cv2.Mat, coords: list[list[int]], angles: list[f
     cv2.imwrite(out_path, img)
 
 
-def plot_minutiae(out_path: str, image: cv2.Mat, locs: np.ndarray, oris: np.ndarray) -> None:
+def plot_minutiae(
+    out_path: str, image: cv2.Mat, locs: np.ndarray, oris: np.ndarray
+) -> None:
     if isinstance(image, torch.Tensor):
         image = _normalized_array_to_grayscale(_tensor_to_2Dnumpy_array(image))
 
