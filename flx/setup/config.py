@@ -6,16 +6,7 @@ from flx.data.biometric_dataset import Identifier, FilteredDataset, BiometricDat
 
 # VISUAL INVESTIGATION
 
-
-class VisualizationMode(Enum):
-    OFF = 0
-    CENTERS_AND_EMBEDDINGS = 1
-    ALL = 2
-
-
-CURRENT_VIS_MODE = VisualizationMode.OFF
-
-INTERACTIVE_VIS = False
+INTERACTIVE_VIS = False  
 
 LEARNING_RATE = 0.025
 

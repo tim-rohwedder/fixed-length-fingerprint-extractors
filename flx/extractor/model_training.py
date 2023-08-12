@@ -17,7 +17,6 @@ from flx.data.biometric_dataset import BiometricDataset, ZippedDataset
 from flx.extractor.extract_embeddings import extract_embeddings
 from flx.models.DeepFinger import DeepFingerTrainingOutput
 from flx.setup.config import LEARNING_RATE
-from flx.visualization.layer_output_visualization import visualize_training_progress
 from flx.utils.torch_helpers import (
     get_device,
     load_model_parameters,
@@ -184,21 +183,6 @@ def train_model(
     training_set = ZippedDataset([fingerprints, minutia_maps, labels])
 
     for epoch in range(len(log) + 1, num_epochs + 1):
-        if epoch == 1:
-            visualize_training_progress(
-                fingerprints,
-                model,
-                loss,
-                0,
-                join(out_dir, "visualization_training_set"),
-            )
-            visualize_training_progress(
-                validation_fingerprints,
-                model,
-                loss,
-                0,
-                join(out_dir, "visualization_validation_set"),
-            )
         print(f"\n\n --- Starting Epoch {epoch} of {num_epochs} ---")
         # Train
         print("\nTraining:")
@@ -222,18 +206,3 @@ def train_model(
 
         if validation_eer <= log.best_entry.validation_equal_error_rate:
             shutil.copyfile(model_path, best_model_path)
-
-        visualize_training_progress(
-            fingerprints,
-            model,
-            loss,
-            epoch,
-            join(out_dir, "visualization_training_set"),
-        )
-        visualize_training_progress(
-            validation_fingerprints,
-            model,
-            loss,
-            epoch,
-            join(out_dir, "visualization_validation_set"),
-        )

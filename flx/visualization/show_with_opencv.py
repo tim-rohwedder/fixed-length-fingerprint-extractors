@@ -61,6 +61,8 @@ def show_minutia_maps(minu_maps: np.ndarray) -> None:
     """
     @param minu_maps : np.ndarray of type np.uint8 must have shape (height, width, n_layers)
     """
+    if not INTERACTIVE_VIS:
+        return
     n_layers = minu_maps.shape[2]
     for i in range(n_layers):
         cv2.imshow(
@@ -76,6 +78,8 @@ def show_minutia_maps_from_tensor(minu_maps: torch.Tensor) -> None:
     """
     @param minu_maps : [0, 1] normalized torch.Tensor; must have shape (n_layers, height, width)
     """
+    if not INTERACTIVE_VIS:
+        return
     for i, layer in enumerate(minu_maps[:]):
         cv2.imshow(
             f"Minutia map {int(i * 360 / minu_maps.shape[0]):3} Degrees Orientation (0 is x Axis)",
