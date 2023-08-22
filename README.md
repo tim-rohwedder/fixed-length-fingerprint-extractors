@@ -1,7 +1,8 @@
-PreAlignMe
-==============================
+## Disclaimer: There will be major update with refactoring and examples of how to use the software until 17.9.
 
-Benchmark of existing and novel fingerprint pre-alignment algorithms for Fixed-Length Figerprint Representation (aka Fingerprint Embeddings). Reference Architecture from https://arxiv.org/abs/1909.09901
+Implementation of Deep Print, a Deep Learning based fixed-length Fingerprint Representation extractor, and various experiments with such architectures. For scientific background see:
+
+[Benchmarking fixed-length Fingerprint Representations across different Embedding Sizes and Sensor Types](https://arxiv.org/abs/2307.08615)
 
 Project Organization
 ------------
