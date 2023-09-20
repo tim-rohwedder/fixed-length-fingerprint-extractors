@@ -89,7 +89,18 @@ The impact of pose alignment on the performance of the DeepPrint model was estim
 
 If you use this code in your research, please cite the following paper:
 
-TODO... 
+```{bibtex}
+@inproceedings{
+    Rohwedder-FixedLengthFingerprintDNN-BIOSIG-2023,
+    author = {T. Rohwedder and D. Osorio-Roig and C. Rathgeb and C. Busch},
+    booktitle = {Intl. Conf. of the Biometrics Special Interest Group ({BIOSIG})},
+    keywords = {Fingerprint recognition, computational workload reduction},
+    month = {September},
+    publisher = {IEEE},
+    title = {Benchmarking fixed-length Fingerprint Representations across different Embedding Sizes and Sensor Types},
+    year = {2023}
+}
+```
 
 Using the `flx` package
 ------------
