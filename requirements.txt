@@ -3,6 +3,7 @@
 
 # external requirements
 black
+jupyter
 matplotlib
 numpy
 opencv-python
