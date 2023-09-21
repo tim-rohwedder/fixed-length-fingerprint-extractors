@@ -88,7 +88,8 @@ data/fingerprints/*
 !data/fingerprints/SFingev2Example
 /models/
 
-notebooks/output/*
+notebooks/example-model/*
+notebooks/DET_curve*
 
 # Mac OS-specific storage files
 .DS_Store
