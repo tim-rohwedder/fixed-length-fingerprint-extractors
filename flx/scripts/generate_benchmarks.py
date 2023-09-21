@@ -61,14 +61,15 @@ def _make_verification(
     name: str, subjects: list[int], impressions_per_subject: list[int]
 ):
     print(f"Making verification benchmark: {name}")
-    bm = _make_verification(subjects, impressions_per_subject)
+    bm = create_verification_benchmark(subjects, impressions_per_subject)
     bm.save(get_verification_benchmark_file(name))
     
 
-def _make_identification(
+def create_identification_benchmark(
     subjects_gallery: list[int],
     subjects_impostor: list[int],
     impressions: list[int],
+    gallery_impression_idx: int = 0,
 ) -> list[ExhaustiveSearch]:
     """
     Makes a gallery containing the first impression [first element of 'impressions', of each of the 'subjects_gallery'.
@@ -80,7 +81,7 @@ def _make_identification(
     assert len(subjects_gallery) > 0
     searches = []
     gallery_samples = np.array(
-        [Identifier(s, impressions[0]) for s in subjects_gallery]
+        [Identifier(s, impressions[gallery_impression_idx]) for s in subjects_gallery]
     )
     for s in subjects_gallery:
         searches += [
@@ -101,8 +102,10 @@ def _make_identification_closed_set(
     impressions: list[int],
 ) -> IdentificationBenchmark:
     print(f"make closed-set identification: {name}")
-    searches = _make_identification(subjects_gallery, [], impressions)
-    bm = IdentificationBenchmark([searches])
+    searches = [create_identification_benchmark(
+        subjects_gallery, [], impressions, gallery_impression_idx=i
+    ) for i in range(len(impressions))]
+    bm = IdentificationBenchmark(searches)
     bm.save(get_closed_set_benchmark_file(name))
 
 
@@ -114,12 +117,12 @@ def _make_identification_open_set(
     l = len(subjects) // 10
     sublists = [subjects[i * l : min((i + 1) * l, len(subjects))] for i in range(folds)]
 
-    folds = []
+    folds: list[IdentificationBenchmark] = []
     for impostor in tqdm.tqdm(sublists):
         gallery = [
             item for sublist in sublists if sublist != impostor for item in sublist
         ]
-        folds.append(_make_identification(gallery, impostor, impressions))
+        folds.append(create_identification_benchmark(gallery, impostor, impressions))
     bm = IdentificationBenchmark(folds)
     bm.save(get_open_set_benchmark_file(name))
 
@@ -134,22 +137,12 @@ def make_benchmarks_SFinge():
     _make_verification(
         "SFingev2ValidationSeparateSubjects", list(range(42000, 44000)), list(range(4))
     )
-    _make_verification("SFingev2TestNone", list(range(1000)), list(range(4)))
-    _make_verification("SFingev2TestCapacitive", list(range(1000)), list(range(4)))
-    _make_verification("SFingev2TestOptical", list(range(1000)), list(range(4)))
     # Identification
     _make_identification(
         "SFingev2ValidationSeparateSubjects",
         list(range(42000, 44000)),
         list(range(4)),
     )
-    _make_identification("SFingev2TestNone", list(range(1000)), list(range(4)))
-    _make_identification(
-        "SFingev2TestCapacitive",
-        list(range(1000)),
-        list(range(4)),
-    )
-    _make_identification("SFingev2TestOptical", list(range(1000)), list(range(4)))
 
 
 def _make_verification_FVC2004():
@@ -244,9 +237,7 @@ def make_benchmarks_mcyt():
 
 def main():
     make_benchmarks_SFinge()
-    make_benchmarks_FVC2004()
     make_benchmarks_mcyt()
-    make_benchmarks_NISTSD4()
 
 
 if __name__ == "__main__":
