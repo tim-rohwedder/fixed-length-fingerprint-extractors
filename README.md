@@ -25,7 +25,10 @@ To learn how to train a variant of the DeepPrint model on a small example datase
 
 To learn how to extract embeddings from a dataset using a trained model, see the [embedding extraction tutorial notebook](notebooks/embedding_extraction_tutorial.ipynb).
 
+### Pre-trained model
 
+The model for an embedding size of 512 can be found under the link
+[Google Drive](https://drive.google.com/drive/folders/1vV2skXApZMhqWTlF2j_qgXDxRYan5U1f?usp=drive_link)
 
 Project Organization
 ------------
